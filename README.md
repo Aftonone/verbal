@@ -68,6 +68,13 @@ Do not move `Verbal.exe` out of the extracted folder; the app needs the adjacent
 Whisper files. The release does not contain model weights, so add a model
 before recording.
 
+### NVIDIA CUDA Support
+1. Download [cuda-inference.zip](https://github.com/Aftonone/verbal/releases/download/v1.0.0/cuda-inference.zip) from releases.
+2. Extract the contents of the ZIP to the root folder of Verbal.
+3. Run Verbal and check the settings to set your inference preference.
+
+See Models and Inference below for more info.
+
 ## Clone the repository and build from source
 
 ### Requirements
@@ -121,3 +128,5 @@ remove compatible `ggml-*.bin` files in `whisper_cpp\models` and restart the
 app to refresh the model selector. Preferences for the inference backend,
 microphone, model, and appearance are stored locally for the current Windows
 user.
+
+See [NVIDIA CUDA Installation Guide](https://docs.nvidia.com/cuda/cuda-installation-guide-microsoft-windows/index.html) for help on setting up CUDA.
