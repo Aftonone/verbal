@@ -1,0 +1,36 @@
+# .NET build and publish outputs
+[Bb]in/
+[Oo]bj/
+[Pp]ublish/
+.vs/
+
+# User-specific IDE files
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+.idea/
+
+# Python caches and virtual environments
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Whisper model weights (users add models to this folder)
+whisper_cpp/models/*.bin
+
+# Keep the runtime CPU/CUDA Whisper CLIs, not bundled test/tools executables
+whisper_cpp/*.exe
+whisper_cpp/**/*.exe
+!whisper_cpp/whisper-cli.exe
+!whisper_cpp/whisper-cli-cpu.exe
+!whisper_cpp/whisper-cli-cuda.exe
+!whisper_cpp/cpu/whisper-cli.exe
+!whisper_cpp/cuda/whisper-cli.exe
+
+# Local and temporary files
+*.log
+*.tmp
+Thumbs.db
+Desktop.ini
