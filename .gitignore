@@ -24,6 +24,7 @@ whisper_cpp/models/*.bin
 whisper_cpp/*.exe
 whisper_cpp/**/*.exe
 !whisper_cpp/whisper-cli.exe
+!whisper_cpp/cuda/whisper-cli.exe
 
 # Local and temporary files
 *.log

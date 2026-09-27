@@ -25,5 +25,11 @@
              CopyToPublishDirectory="PreserveNewest" />
     <Content Include="whisper_cpp\whisper-cli.exe;whisper_cpp\*.dll;whisper_cpp\models\README.txt"
              CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="whisper_cpp\cuda\whisper-cli.exe"
+             Condition="Exists('whisper_cpp\cuda\whisper-cli.exe')"
+             CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="whisper_cpp\cuda\*.dll"
+             Condition="Exists('whisper_cpp\cuda\whisper-cli.exe')"
+             CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

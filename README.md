@@ -105,15 +105,19 @@ dotnet publish .\Verbal.csproj -c Release -r win-x64 --self-contained true -o .\
 
 Run `.\publish\Verbal.exe` and keep the entire `publish` folder together. The
 publish includes the CPU Whisper CLI and its DLLs directly in
-`publish\whisper_cpp`; it does not include model weights. Add models to
-`publish\whisper_cpp\models`. To prepare a clean release, publish to an empty
-output folder or remove an older output folder first so stale files are not
-left behind.
+`publish\whisper_cpp`. If `whisper_cpp\cuda\whisper-cli.exe` and its DLLs are
+present, those files are also included under `publish\whisper_cpp\cuda`. Model
+weights are not included; add models to `publish\whisper_cpp\models`. To
+prepare a clean release, publish to an empty output folder or remove an older
+output folder first so stale files are not left behind.
 
 ## Models and inference
 
-Verbal uses CPU inference for compatibility across Windows systems. Model
-files are user-managed: add or remove compatible `ggml-*.bin` files in
-`whisper_cpp\models` and restart the app to refresh the model selector.
-Preferences for the microphone, model, and appearance are stored locally for
-the current Windows user.
+Verbal uses CPU inference by default for compatibility across Windows systems.
+When `whisper_cpp\cuda\whisper-cli.exe` is present, an inference selector
+appears in Settings so users can choose CPU or CUDA. CUDA inference requires
+compatible NVIDIA hardware and drivers. Model files are user-managed: add or
+remove compatible `ggml-*.bin` files in `whisper_cpp\models` and restart the
+app to refresh the model selector. Preferences for the inference backend,
+microphone, model, and appearance are stored locally for the current Windows
+user.
