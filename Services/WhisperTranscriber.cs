@@ -1,28 +1,28 @@
-using System.IO;
 using System.Diagnostics;
 
 namespace Verbal.Services;
 
-internal sealed class WhisperTranscriber(WhisperInstallation installation)
+internal sealed class WhisperTranscriber
 {
     public async Task<string> TranscribeAsync(
         string audioPath,
-        string modelPath)
+        string modelPath,
+        WhisperExecutable executable)
     {
-        var executablePath = installation.GetCpuExecutablePath()
-            ?? throw new FileNotFoundException(
-                "Could not find the CPU Whisper CLI in whisper_cpp\\cpu.");
         var startInfo = new ProcessStartInfo
         {
-            FileName = executablePath,
-            WorkingDirectory = Path.GetDirectoryName(executablePath)
-                ?? installation.WorkingDirectory,
+            FileName = executable.Path,
+            WorkingDirectory = executable.WorkingDirectory,
             UseShellExecute = false,
             CreateNoWindow = true,
             RedirectStandardOutput = true,
             RedirectStandardError = true
         };
-        startInfo.ArgumentList.Add("--no-gpu");
+        if (executable.Backend == WhisperBackend.Cpu)
+        {
+            startInfo.ArgumentList.Add("--no-gpu");
+        }
+
         startInfo.ArgumentList.Add("--no-prints");
         startInfo.ArgumentList.Add("--no-timestamps");
         startInfo.ArgumentList.Add("--model");

@@ -15,6 +15,7 @@ public partial class MainWindow : Window
     private readonly AudioRecorder _recorder = new();
     private WhisperTranscriber? _transcriber;
     private WhisperInstallation? _installation;
+    private WhisperExecutable? _recordingExecutable;
     private ThemeManager.UserSettings _settings = new();
     private readonly DispatcherTimer _targetWindowTimer = new();
     private GlobalHotkeyService? _hotkeys;
@@ -61,7 +62,21 @@ public partial class MainWindow : Window
         try
         {
             _installation = WhisperInstallation.Find();
-            _transcriber = new WhisperTranscriber(_installation);
+            var executables = _installation.GetExecutables();
+            InferenceSettingsPanel.Visibility = executables.Any(executable =>
+                executable.Backend == WhisperBackend.Cuda)
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+            InferenceSelector.ItemsSource = executables;
+            InferenceSelector.SelectedItem = executables.FirstOrDefault(executable =>
+                string.Equals(
+                    executable.Backend.ToString(),
+                    _settings.InferenceBackend,
+                    StringComparison.OrdinalIgnoreCase))
+                ?? executables.FirstOrDefault(executable => executable.Backend == WhisperBackend.Cpu)
+                ?? executables.FirstOrDefault();
+            _recordingExecutable = InferenceSelector.SelectedItem as WhisperExecutable;
+            _transcriber = new WhisperTranscriber();
             var models = _installation.GetModels();
             ModelSelector.ItemsSource = models;
             ModelSelector.SelectedItem = models.FirstOrDefault(model =>
@@ -199,6 +214,21 @@ public partial class MainWindow : Window
         }
     }
 
+    private void InferenceSelector_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (InferenceSelector.SelectedItem is WhisperExecutable executable)
+        {
+            _recordingExecutable = executable;
+            if (!_loadingSettings &&
+                _recordingMode == RecordingMode.None &&
+                !_isProcessing)
+            {
+                _settings.InferenceBackend = executable.Backend.ToString();
+                SaveSettings($"Using {executable.DisplayName} inference.");
+            }
+        }
+    }
+
     private void SettingsButton_Click(object sender, RoutedEventArgs e)
     {
         SettingsPopup.IsOpen = !SettingsPopup.IsOpen;
@@ -314,9 +344,19 @@ public partial class MainWindow : Window
             return false;
         }
 
+        if (InferenceSelector.SelectedItem is not WhisperExecutable selectedExecutable)
+        {
+            UpdateStatus(
+                "No Whisper engine selected",
+                "Select an available inference option in Settings.",
+                StatusKind.Error);
+            return false;
+        }
+
         try
         {
             _recordingModelPath = selectedModel.Path;
+            _recordingExecutable = selectedExecutable;
             if (MicrophoneSelector.SelectedItem is MicrophoneDevice microphone)
             {
                 _recorder.DeviceNumber = microphone.DeviceNumber;
@@ -358,6 +398,7 @@ public partial class MainWindow : Window
 
         var targetWindow = _recordingTargetWindow;
         var modelPath = _recordingModelPath;
+        var executable = _recordingExecutable;
         var autoType = AutoTypeToggle.IsChecked == true;
         try
         {
@@ -383,7 +424,8 @@ public partial class MainWindow : Window
                     ?? throw new InvalidOperationException("The Whisper engine is not available.");
                 transcript = await transcriber.TranscribeAsync(
                     recording.Path,
-                    modelPath ?? throw new InvalidOperationException("No Whisper model is selected."));
+                    modelPath ?? throw new InvalidOperationException("No Whisper model is selected."),
+                    executable ?? throw new InvalidOperationException("No Whisper inference device is selected."));
             }
             finally
             {
@@ -519,6 +561,8 @@ public partial class MainWindow : Window
         MicrophoneSelector.IsEnabled = !busy && _recordingMode == RecordingMode.None;
         ModelSelector.IsEnabled =
             !busy && _recordingMode == RecordingMode.None && ModelSelector.Items.Count > 0;
+        InferenceSelector.IsEnabled =
+            !busy && _recordingMode == RecordingMode.None && InferenceSelector.Items.Count > 0;
         ToggleLabel.Text = _recordingMode == RecordingMode.Toggle
             ? "STOP RECORDING"
             : "START RECORDING";

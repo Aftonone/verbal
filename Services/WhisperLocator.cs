@@ -6,6 +6,31 @@ internal sealed record WhisperInstallation(
     string ModelsDirectory,
     string WorkingDirectory)
 {
+    public IReadOnlyList<WhisperExecutable> GetExecutables()
+    {
+        var executables = new List<WhisperExecutable>();
+        var cpuExecutable = GetCpuExecutablePath();
+        if (cpuExecutable is not null)
+        {
+            executables.Add(new WhisperExecutable(
+                WhisperBackend.Cpu,
+                cpuExecutable,
+                Path.GetDirectoryName(cpuExecutable) ?? WorkingDirectory));
+        }
+
+        var cudaDirectory = Path.Combine(WorkingDirectory, "cuda");
+        var cudaExecutable = Path.Combine(cudaDirectory, "whisper-cli.exe");
+        if (File.Exists(cudaExecutable))
+        {
+            executables.Add(new WhisperExecutable(
+                WhisperBackend.Cuda,
+                cudaExecutable,
+                cudaDirectory));
+        }
+
+        return executables;
+    }
+
     public static WhisperInstallation Find()
     {
         var candidates = new[]
@@ -62,6 +87,27 @@ internal sealed record WhisperInstallation(
 
         return models;
     }
+}
+
+internal enum WhisperBackend
+{
+    Cpu,
+    Cuda
+}
+
+internal sealed record WhisperExecutable(
+    WhisperBackend Backend,
+    string Path,
+    string WorkingDirectory)
+{
+    public string DisplayName => Backend switch
+    {
+        WhisperBackend.Cpu => "CPU",
+        WhisperBackend.Cuda => "CUDA (NVIDIA GPU)",
+        _ => throw new InvalidOperationException($"Unsupported Whisper backend: {Backend}.")
+    };
+
+    public override string ToString() => DisplayName;
 }
 
 internal sealed record WhisperModel(string FileName, string Path)
