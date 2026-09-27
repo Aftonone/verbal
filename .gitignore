@@ -20,14 +20,10 @@ venv/
 # Whisper model weights (users add models to this folder)
 whisper_cpp/models/*.bin
 
-# Keep the runtime CPU/CUDA Whisper CLIs, not bundled test/tools executables
+# Keep the runtime Whisper CLI, not bundled test/tools executables
 whisper_cpp/*.exe
 whisper_cpp/**/*.exe
 !whisper_cpp/whisper-cli.exe
-!whisper_cpp/whisper-cli-cpu.exe
-!whisper_cpp/whisper-cli-cuda.exe
-!whisper_cpp/cpu/whisper-cli.exe
-!whisper_cpp/cuda/whisper-cli.exe
 
 # Local and temporary files
 *.log

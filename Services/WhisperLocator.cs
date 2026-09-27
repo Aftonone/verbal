@@ -6,62 +6,6 @@ internal sealed record WhisperInstallation(
     string ModelsDirectory,
     string WorkingDirectory)
 {
-    public IReadOnlyList<WhisperExecutable> GetExecutables()
-    {
-        var executables = new List<WhisperExecutable>();
-        var cpuDirectory = Path.Combine(WorkingDirectory, "cpu");
-        var cpuSubfolderExecutable = Path.Combine(cpuDirectory, "whisper-cli.exe");
-        if (File.Exists(cpuSubfolderExecutable))
-        {
-            executables.Add(new WhisperExecutable(
-                WhisperBackend.Cpu,
-                cpuSubfolderExecutable,
-                cpuDirectory));
-        }
-        else
-        {
-            var cpuExecutable = Path.Combine(WorkingDirectory, "whisper-cli-cpu.exe");
-            if (File.Exists(cpuExecutable))
-            {
-                executables.Add(new WhisperExecutable(
-                    WhisperBackend.Cpu,
-                    cpuExecutable,
-                    WorkingDirectory));
-            }
-            else
-            {
-                cpuExecutable = Path.Combine(WorkingDirectory, "whisper-cli.exe");
-                if (File.Exists(cpuExecutable))
-                {
-                    executables.Add(new WhisperExecutable(
-                        WhisperBackend.Cpu,
-                        cpuExecutable,
-                        WorkingDirectory));
-                }
-            }
-        }
-
-        var cudaDirectory = Path.Combine(WorkingDirectory, "cuda");
-        var cudaExecutable = Path.Combine(cudaDirectory, "whisper-cli.exe");
-        if (File.Exists(cudaExecutable))
-        {
-            executables.Add(new WhisperExecutable(WhisperBackend.Cuda, cudaExecutable, cudaDirectory));
-        }
-        else
-        {
-            cudaExecutable = Path.Combine(WorkingDirectory, "whisper-cli-cuda.exe");
-            if (File.Exists(cudaExecutable))
-            {
-                executables.Add(new WhisperExecutable(
-                    WhisperBackend.Cuda,
-                    cudaExecutable,
-                    WorkingDirectory));
-            }
-        }
-
-        return executables;
-    }
-
     public static WhisperInstallation Find()
     {
         var candidates = new[]
@@ -78,7 +22,7 @@ internal sealed record WhisperInstallation(
                 var whisperDirectory = Path.Combine(directory.FullName, "whisper_cpp");
                 var modelsDirectory = Path.Combine(whisperDirectory, "models");
                 var installation = new WhisperInstallation(modelsDirectory, whisperDirectory);
-                if (installation.GetExecutables().Count > 0)
+                if (installation.GetCpuExecutablePath() is not null)
                 {
                     return installation;
                 }
@@ -88,9 +32,14 @@ internal sealed record WhisperInstallation(
         }
 
         throw new FileNotFoundException(
-            "Could not find a Whisper CLI executable (whisper-cli.exe, whisper-cli-cpu.exe, " +
-            "or whisper-cli-cuda.exe) in the whisper_cpp folder or its cpu/cuda subfolders. " +
+            "Could not find the CPU Whisper CLI (whisper_cpp\\whisper-cli.exe). " +
             "Keep the whisper_cpp folder beside the app or in one of its parent folders.");
+    }
+
+    public string? GetCpuExecutablePath()
+    {
+        var cpuExecutable = Path.Combine(WorkingDirectory, "whisper-cli.exe");
+        return File.Exists(cpuExecutable) ? cpuExecutable : null;
     }
 
     public IReadOnlyList<WhisperModel> GetModels()
@@ -113,27 +62,6 @@ internal sealed record WhisperInstallation(
 
         return models;
     }
-}
-
-internal enum WhisperBackend
-{
-    Cpu,
-    Cuda
-}
-
-internal sealed record WhisperExecutable(
-    WhisperBackend Backend,
-    string Path,
-    string WorkingDirectory)
-{
-    public string DisplayName => Backend switch
-    {
-        WhisperBackend.Cpu => "CPU",
-        WhisperBackend.Cuda => "CUDA (NVIDIA GPU)",
-        _ => throw new InvalidOperationException($"Unsupported Whisper backend: {Backend}.")
-    };
-
-    public override string ToString() => DisplayName;
 }
 
 internal sealed record WhisperModel(string FileName, string Path)

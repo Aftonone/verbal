@@ -103,7 +103,6 @@ internal static class ThemeManager
 
         public bool DarkMode { get; set; }
         public string? ModelFile { get; set; }
-        public string? InferenceBackend { get; set; }
         public int? MicrophoneDeviceNumber { get; set; }
         public string? MicrophoneName { get; set; }
     }

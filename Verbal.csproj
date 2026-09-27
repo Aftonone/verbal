@@ -23,13 +23,7 @@
     <Content Include="Assets\app.ico"
              CopyToOutputDirectory="PreserveNewest"
              CopyToPublishDirectory="PreserveNewest" />
-    <Content Include="whisper_cpp\whisper-cli.exe"
-             TargetPath="whisper_cpp\cpu\whisper-cli.exe"
-             CopyToPublishDirectory="PreserveNewest" />
-    <Content Include="whisper_cpp\*.dll"
-             TargetPath="whisper_cpp\cpu\%(Filename)%(Extension)"
-             CopyToPublishDirectory="PreserveNewest" />
-    <Content Include="whisper_cpp\cpu\whisper-cli*.exe;whisper_cpp\cpu\*.dll;whisper_cpp\cuda\whisper-cli*.exe;whisper_cpp\cuda\*.dll;whisper_cpp\models\README.txt"
+    <Content Include="whisper_cpp\whisper-cli.exe;whisper_cpp\*.dll;whisper_cpp\models\README.txt"
              CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>
