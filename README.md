@@ -5,6 +5,7 @@ type the transcript into a text field automatically or allow you to copy the tra
 **Whisper model files are not included.**
 
 ## Using Verbal
+<img width="446" height="493" alt="image" src="https://github.com/user-attachments/assets/b1694ed5-b5b9-4a90-b8fd-d84eb4460fd0" />
 
 ### Requirements
 
