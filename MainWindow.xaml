@@ -119,6 +119,45 @@
                                    FontSize="10"
                                    Foreground="{DynamicResource MutedInk}"
                                    Margin="0,9,0,0" />
+                        <TextBlock Text="Keyboard shortcuts"
+                                   FontSize="12"
+                                   FontWeight="SemiBold"
+                                   Margin="0,14,0,5" />
+                        <Grid Margin="0,3,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="Hold to talk"
+                                       FontSize="11"
+                                       VerticalAlignment="Center" />
+                            <Button x:Name="PushToTalkShortcutButton"
+                                    Grid.Column="1"
+                                    Padding="10,5"
+                                    Click="PushToTalkShortcutButton_Click"
+                                    PreviewKeyDown="ShortcutButton_PreviewKeyDown"
+                                    AutomationProperties.Name="Change hold-to-talk shortcut" />
+                        </Grid>
+                        <Grid Margin="0,5,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="Toggle recording"
+                                       FontSize="11"
+                                       VerticalAlignment="Center" />
+                            <Button x:Name="ToggleShortcutButton"
+                                    Grid.Column="1"
+                                    Padding="10,5"
+                                    Click="ToggleShortcutButton_Click"
+                                    PreviewKeyDown="ShortcutButton_PreviewKeyDown"
+                                    AutomationProperties.Name="Change toggle-recording shortcut" />
+                        </Grid>
+                        <TextBlock Text="Click a shortcut button and press a key combination. Use a modifier with letter or number keys."
+                                   FontSize="10"
+                                   Foreground="{DynamicResource MutedInk}"
+                                   Margin="0,6,0,0"
+                                   TextWrapping="Wrap" />
                         <StackPanel x:Name="InferenceSettingsPanel"
                                     Visibility="Collapsed">
                             <TextBlock Text="Whisper inference"
@@ -157,6 +196,23 @@
                                           Click="DarkModeToggle_Click"
                                           AutomationProperties.Name="Dark mode" />
                         </DockPanel>
+                        <DockPanel Margin="0,14,0,0">
+                            <TextBlock Text="Start with Windows"
+                                       FontSize="12"
+                                       Foreground="{DynamicResource Ink}"
+                                       VerticalAlignment="Center"
+                                       DockPanel.Dock="Left" />
+                            <ToggleButton x:Name="StartWithWindowsToggle"
+                                          Style="{StaticResource ThemeToggleStyle}"
+                                          IsChecked="False"
+                                          HorizontalAlignment="Right"
+                                          Click="StartWithWindowsToggle_Click"
+                                          AutomationProperties.Name="Start Verbal with Windows" />
+                        </DockPanel>
+                        <TextBlock Text="Starts minimized in the notification area."
+                                   FontSize="10"
+                                   Foreground="{DynamicResource MutedInk}"
+                                   Margin="0,6,0,0" />
                     </StackPanel>
                 </Border>
             </Popup>
@@ -192,7 +248,7 @@
                                            FontSize="11"
                                            FontWeight="Bold"
                                            HorizontalAlignment="Center" />
-                                <TextBlock Text="F8"
+                                <TextBlock Text="{Binding Tag, RelativeSource={RelativeSource AncestorType={x:Type Button}}}"
                                            FontSize="10"
                                            Opacity="0.8"
                                            HorizontalAlignment="Center"
@@ -225,7 +281,8 @@
                                FontSize="11"
                                FontWeight="Bold"
                                HorizontalAlignment="Center" />
-                    <TextBlock Text="F9 · toggle"
+                    <TextBlock x:Name="ToggleShortcutLabel"
+                               Text="F9 · toggle"
                                FontSize="10"
                                Foreground="{DynamicResource MutedInk}"
                                HorizontalAlignment="Center"
@@ -303,7 +360,8 @@
             </Grid>
         </Border>
 
-        <TextBlock Grid.Row="3"
+        <TextBlock x:Name="ShortcutSummaryText"
+                   Grid.Row="3"
                    Text="F8  Hold to talk     ·     F9  Toggle"
                    FontSize="10"
                    Foreground="{DynamicResource MutedInk}"

@@ -35,16 +35,29 @@ between size and accuracy. If you find you need more accuracy, try a larger one.
 1. Open the destination app and select the text field where you want the
    transcript to go.
 2. Start recording in Verbal:
-   - Hold **F8** or **Hold to talk** to record while pressed. Release to stop
-     and transcribe.
-   - Press **F9** or **Start recording** to toggle recording on and off.
+   - Hold **F8** by default, or **Hold to talk**, to record while pressed.
+     Release to stop and transcribe.
+   - Press **F9** by default, or **Start recording**, to toggle recording on
+     and off.
 3. The transcript appears in Verbal's editable text area. Automatic typing is
    enabled by default. Turn it off if you want to review or edit the transcript
    before inserting it.
 4. Use **Insert into target** to type the transcript into the selected field,
    or **Copy** to put it on the clipboard.
 
-The settings menu will allow you to select the model and your microphone.
+Use Settings to select your model and microphone, and to change either global
+keyboard shortcut. Click a shortcut button and press the desired key or
+combination. Function keys work on their own; letter and number keys require a
+modifier such as Ctrl, Alt, Shift, or Windows. The defaults are F8 for
+push-to-talk and F9 for toggle recording. These shortcuts work while Verbal is
+in the background or minimized. Choose combinations that do not conflict with
+shortcuts used by other apps.
+Minimize Verbal to move it into the Windows notification area. The tray icon
+shows the live microphone level while recording. Double-click the icon to
+reopen the window, or right-click it to open Verbal, start or stop recording,
+or exit. Turn on **Start with Windows** in Settings to launch Verbal
+automatically when you sign in; it starts minimized in the notification area.
+Turn the option off to remove it from Windows startup.
 
 Verbal remembers the last active window outside itself and restores it before
 typing. Windows may prevent foreground activation in some situations. If that
@@ -130,3 +143,4 @@ microphone, model, and appearance are stored locally for the current Windows
 user.
 
 See [NVIDIA CUDA Installation Guide](https://docs.nvidia.com/cuda/cuda-installation-guide-microsoft-windows/index.html) for help on setting up CUDA.
+

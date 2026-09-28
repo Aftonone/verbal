@@ -2,6 +2,8 @@ using System.IO;
 using System.Text.Json;
 using System.Windows;
 using System.Windows.Media;
+using Application = System.Windows.Application;
+using Color = System.Windows.Media.Color;
 
 namespace Verbal.Services;
 
@@ -104,6 +106,8 @@ internal static class ThemeManager
         public bool DarkMode { get; set; }
         public string? ModelFile { get; set; }
         public string? InferenceBackend { get; set; }
+        public string? PushToTalkShortcut { get; set; }
+        public string? ToggleShortcut { get; set; }
         public int? MicrophoneDeviceNumber { get; set; }
         public string? MicrophoneName { get; set; }
     }

@@ -7,6 +7,13 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using Verbal.Services;
+using Application = System.Windows.Application;
+using Brush = System.Windows.Media.Brush;
+using Clipboard = System.Windows.Clipboard;
+using KeyEventArgs = System.Windows.Input.KeyEventArgs;
+using MessageBox = System.Windows.MessageBox;
+using MouseEventArgs = System.Windows.Input.MouseEventArgs;
+using Color = System.Windows.Media.Color;
 
 namespace Verbal;
 
@@ -18,7 +25,12 @@ public partial class MainWindow : Window
     private WhisperExecutable? _recordingExecutable;
     private ThemeManager.UserSettings _settings = new();
     private readonly DispatcherTimer _targetWindowTimer = new();
+    private TrayIconService? _trayIcon;
     private GlobalHotkeyService? _hotkeys;
+    private HwndSource? _hotkeySource;
+    private KeyboardShortcut _pushToTalkShortcut = new(Key.F8, ModifierKeys.None);
+    private KeyboardShortcut _toggleShortcut = new(Key.F9, ModifierKeys.None);
+    private ShortcutBeingCaptured _shortcutBeingCaptured;
     private nint _lastExternalWindow;
     private nint _recordingTargetWindow;
     private string? _recordingModelPath;
@@ -47,8 +59,30 @@ public partial class MainWindow : Window
                 MessageBoxImage.Warning);
         }
 
+        _pushToTalkShortcut = KeyboardShortcut.ParseOrDefault(
+                _settings.PushToTalkShortcut,
+                Key.F8);
+        _toggleShortcut = KeyboardShortcut.ParseOrDefault(
+                _settings.ToggleShortcut,
+                Key.F9);
+        UpdateShortcutLabels();
+
         ThemeManager.Apply(Application.Current, _settings.DarkMode);
         DarkModeToggle.IsChecked = _settings.DarkMode;
+        try
+        {
+            StartWithWindowsToggle.IsChecked = StartupManager.IsEnabledForCurrentExecutable();
+        }
+        catch (Exception ex) when (
+            ex is IOException or UnauthorizedAccessException or System.Security.SecurityException)
+        {
+            MessageBox.Show(
+                $"The Windows startup preference could not be read.\n\n{ex.Message}",
+                "Startup setting unavailable",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+        }
+
         var microphones = AudioRecorder.GetDevices();
         MicrophoneSelector.ItemsSource = microphones;
         MicrophoneSelector.SelectedItem = microphones.FirstOrDefault(device =>
@@ -115,9 +149,24 @@ public partial class MainWindow : Window
 
         SourceInitialized += OnSourceInitialized;
         Closed += OnClosed;
+        StateChanged += MainWindow_StateChanged;
+        _trayIcon = new TrayIconService(
+            Path.Combine(AppContext.BaseDirectory, "Assets", "app.ico"),
+            () => RunOnUiThread(RestoreFromTray),
+            () => RunOnUiThread(ToggleRecording),
+            () => _recordingMode != RecordingMode.None,
+            () => _isProcessing,
+            () => RunOnUiThread(ExitFromTray));
         _targetWindowTimer.Interval = TimeSpan.FromMilliseconds(250);
         _targetWindowTimer.Tick += TrackTargetWindow;
         _targetWindowTimer.Start();
+    }
+
+    public void StartMinimizedToTray()
+    {
+        ShowInTaskbar = false;
+        Show();
+        Hide();
     }
 
     private void OnSourceInitialized(object? sender, EventArgs e)
@@ -132,7 +181,23 @@ public partial class MainWindow : Window
             return;
         }
 
-        _hotkeys = new GlobalHotkeyService(source);
+        _hotkeySource = source;
+        ConfigureHotkeys();
+    }
+
+    private void ConfigureHotkeys()
+    {
+        _hotkeys?.Dispose();
+        _hotkeys = null;
+        if (_hotkeySource is null || _shortcutBeingCaptured != ShortcutBeingCaptured.None)
+        {
+            return;
+        }
+
+        _hotkeys = new GlobalHotkeyService(
+            _hotkeySource,
+            _pushToTalkShortcut,
+            _toggleShortcut);
         if (_hotkeys.InitialWarning is not null)
         {
             UpdateStatus("Shortcut unavailable", _hotkeys.InitialWarning, StatusKind.Error);
@@ -151,6 +216,101 @@ public partial class MainWindow : Window
             });
         _hotkeys.TogglePressed += () =>
             Dispatcher.BeginInvoke(ToggleRecording);
+    }
+
+    private void PushToTalkShortcutButton_Click(object sender, RoutedEventArgs e) =>
+        BeginShortcutCapture(ShortcutBeingCaptured.PushToTalk);
+
+    private void ToggleShortcutButton_Click(object sender, RoutedEventArgs e) =>
+        BeginShortcutCapture(ShortcutBeingCaptured.Toggle);
+
+    private void BeginShortcutCapture(ShortcutBeingCaptured shortcut)
+    {
+        if (_recordingMode != RecordingMode.None || _isProcessing)
+        {
+            UpdateStatus("Shortcut unavailable", "Stop recording before changing shortcuts.", StatusKind.Error);
+            return;
+        }
+
+        _shortcutBeingCaptured = shortcut;
+        _hotkeys?.Dispose();
+        _hotkeys = null;
+        var button = shortcut == ShortcutBeingCaptured.PushToTalk
+            ? PushToTalkShortcutButton
+            : ToggleShortcutButton;
+        button.Content = "Press keys…";
+        button.Focus();
+        UpdateStatus(
+            "Waiting for shortcut",
+            "Press a key combination. Press Escape to cancel.",
+            StatusKind.Ready);
+    }
+
+    private void ShortcutButton_PreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        if (_shortcutBeingCaptured == ShortcutBeingCaptured.None)
+        {
+            return;
+        }
+
+        e.Handled = true;
+        var key = e.Key == Key.System ? e.SystemKey : e.Key;
+        if (key == Key.Escape)
+        {
+            EndShortcutCapture();
+            UpdateStatus("Shortcut unchanged", "The existing keyboard shortcuts are still active.", StatusKind.Ready);
+            return;
+        }
+
+        var shortcut = new KeyboardShortcut(key, Keyboard.Modifiers);
+        if (!shortcut.IsSafe)
+        {
+            UpdateStatus(
+                "Shortcut needs a modifier",
+                "Use a function key or add Ctrl, Alt, Shift, or Windows to that key.",
+                StatusKind.Error);
+            return;
+        }
+
+        var otherShortcut = _shortcutBeingCaptured == ShortcutBeingCaptured.PushToTalk
+            ? _toggleShortcut
+            : _pushToTalkShortcut;
+        if (shortcut == otherShortcut)
+        {
+            UpdateStatus("Shortcut already in use", "Choose a different combination for each action.", StatusKind.Error);
+            return;
+        }
+
+        if (_shortcutBeingCaptured == ShortcutBeingCaptured.PushToTalk)
+        {
+            _pushToTalkShortcut = shortcut;
+            _settings.PushToTalkShortcut = shortcut.Serialize();
+        }
+        else
+        {
+            _toggleShortcut = shortcut;
+            _settings.ToggleShortcut = shortcut.Serialize();
+        }
+
+        UpdateShortcutLabels();
+        SaveSettings($"Keyboard shortcut saved: {shortcut}.");
+        EndShortcutCapture();
+    }
+
+    private void EndShortcutCapture()
+    {
+        _shortcutBeingCaptured = ShortcutBeingCaptured.None;
+        PushToTalkShortcutButton.Content = _pushToTalkShortcut.ToString();
+        ToggleShortcutButton.Content = _toggleShortcut.ToString();
+        ConfigureHotkeys();
+    }
+
+    private void UpdateShortcutLabels()
+    {
+        HoldButton.Tag = _pushToTalkShortcut.ToString();
+        ToggleShortcutLabel.Text = $"{_toggleShortcut} · toggle";
+        ShortcutSummaryText.Text =
+            $"{_pushToTalkShortcut}  Hold to talk     ·     {_toggleShortcut}  Toggle";
     }
 
     private void TrackTargetWindow(object? sender, EventArgs e)
@@ -174,7 +334,34 @@ public partial class MainWindow : Window
         InnerSoundWave.Opacity = 0.24 + normalized * 0.65;
         MiddleSoundWave.Opacity = Math.Clamp((normalized - 0.04) / 0.48 * 0.82, 0, 0.82);
         OuterSoundWave.Opacity = Math.Clamp((normalized - 0.18) / 0.52 * 0.74, 0, 0.74);
+        _trayIcon?.UpdateInputLevel(level, _recordingMode != RecordingMode.None);
     }
+
+    private void MainWindow_StateChanged(object? sender, EventArgs e)
+    {
+        if (WindowState == WindowState.Minimized)
+        {
+            ShowInTaskbar = false;
+            Hide();
+        }
+    }
+
+    private void RestoreFromTray()
+    {
+        ShowInTaskbar = true;
+        if (!IsVisible)
+        {
+            Show();
+        }
+
+        WindowState = WindowState.Normal;
+        Activate();
+    }
+
+    private void ExitFromTray() => Close();
+
+    private void RunOnUiThread(Action action) =>
+        Dispatcher.BeginInvoke(action);
 
     private void ResetInputLevel()
     {
@@ -241,6 +428,27 @@ public partial class MainWindow : Window
         _settings.DarkMode = darkMode;
         SaveSettings(
             darkMode ? "Dark mode enabled and saved." : "Light mode enabled and saved.");
+    }
+
+    private void StartWithWindowsToggle_Click(object sender, RoutedEventArgs e)
+    {
+        var enabled = StartWithWindowsToggle.IsChecked == true;
+        try
+        {
+            StartupManager.SetEnabled(enabled);
+            UpdateStatus(
+                enabled ? "Startup enabled" : "Startup disabled",
+                enabled
+                    ? "Verbal will start minimized in the notification area when you sign in."
+                    : "Verbal will no longer start automatically when you sign in.",
+                StatusKind.Ready);
+        }
+        catch (Exception ex) when (
+            ex is IOException or UnauthorizedAccessException or System.Security.SecurityException or InvalidOperationException)
+        {
+            StartWithWindowsToggle.IsChecked = !enabled;
+            UpdateStatus("Could not update startup setting", ex.Message, StatusKind.Error);
+        }
     }
 
     private void SaveSettings(string successMessage)
@@ -366,12 +574,13 @@ public partial class MainWindow : Window
             ResetInputLevel();
             _recorder.Start();
             _recordingMode = mode;
+            _trayIcon?.UpdateInputLevel(0, true);
             UpdateControls();
             UpdateStatus(
                 "Listening…",
                 _recordingTargetWindow == 0
                     ? "Recording audio. Select a target field before inserting."
-                    : "Speak naturally. Release F8 or stop the recording to transcribe.",
+                    : $"Speak naturally. Release {_pushToTalkShortcut} or stop the recording to transcribe.",
                 StatusKind.Recording);
             return true;
         }
@@ -392,6 +601,7 @@ public partial class MainWindow : Window
 
         _recordingMode = RecordingMode.None;
         _isProcessing = true;
+        _trayIcon?.UpdateInputLevel(0, false);
         ResetInputLevel();
         UpdateControls();
         UpdateStatus("Transcribing…", "Whisper is converting your speech to text.", StatusKind.Processing);
@@ -409,7 +619,7 @@ public partial class MainWindow : Window
                 if (recording.Duration < TimeSpan.FromMilliseconds(300))
                 {
                     throw new InvalidOperationException(
-                        "The recording was too short to transcribe. Hold F8 longer or use toggle recording.");
+                        $"The recording was too short to transcribe. Hold {_pushToTalkShortcut} longer or use toggle recording.");
                 }
 
                 if (recording.Rms < 35 && recording.Peak < 150)
@@ -566,6 +776,7 @@ public partial class MainWindow : Window
         ToggleLabel.Text = _recordingMode == RecordingMode.Toggle
             ? "STOP RECORDING"
             : "START RECORDING";
+        _trayIcon?.RefreshMenu();
     }
 
     private void UpdateStatus(string title, string detail, StatusKind kind)
@@ -601,6 +812,7 @@ public partial class MainWindow : Window
         _targetWindowTimer.Stop();
         _hotkeys?.Dispose();
         _recorder.Dispose();
+        _trayIcon?.Dispose();
     }
 
     [System.Runtime.InteropServices.DllImport("user32.dll")]
@@ -613,6 +825,13 @@ public partial class MainWindow : Window
     {
         None,
         Hold,
+        Toggle
+    }
+
+    private enum ShortcutBeingCaptured
+    {
+        None,
+        PushToTalk,
         Toggle
     }
 

@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Runtime.InteropServices;
+using System.Windows.Input;
 using System.Windows.Interop;
 
 namespace Verbal.Services;
@@ -8,8 +9,6 @@ internal sealed class GlobalHotkeyService : IDisposable
 {
     private const int HotkeyId = 0x5756;
     private const uint ModNoRepeat = 0x4000;
-    private const uint VkF8 = 0x77;
-    private const uint VkF9 = 0x78;
     private const int WhKeyboardLl = 13;
     private const int WmHotkey = 0x0312;
     private const int WmKeyDown = 0x0100;
@@ -19,8 +18,9 @@ internal sealed class GlobalHotkeyService : IDisposable
 
     private readonly HwndSource _source;
     private readonly HookProcedure _hookProcedure;
+    private readonly KeyboardShortcut _pushToTalkShortcut;
     private nint _keyboardHook;
-    private bool _f8IsDown;
+    private bool _pushToTalkIsDown;
     private bool _toggleRegistered;
     private bool _disposed;
 
@@ -28,15 +28,25 @@ internal sealed class GlobalHotkeyService : IDisposable
     public event Action? TogglePressed;
     public string? InitialWarning { get; private set; }
 
-    public GlobalHotkeyService(HwndSource source)
+    public GlobalHotkeyService(
+        HwndSource source,
+        KeyboardShortcut pushToTalkShortcut,
+        KeyboardShortcut toggleShortcut)
     {
         _source = source;
+        _pushToTalkShortcut = pushToTalkShortcut;
         _source.AddHook(WindowProcedure);
 
-        _toggleRegistered = RegisterHotKey(_source.Handle, HotkeyId, ModNoRepeat, VkF9);
+        var toggleModifiers = ToWindowsModifiers(toggleShortcut.Modifiers) | ModNoRepeat;
+        _toggleRegistered = RegisterHotKey(
+            _source.Handle,
+            HotkeyId,
+            toggleModifiers,
+            (uint)toggleShortcut.VirtualKey);
         if (!_toggleRegistered)
         {
-            InitialWarning = "F9 is already registered by another app; use the toggle button.";
+            InitialWarning =
+                $"{toggleShortcut} could not be registered (it may already be in use); use the toggle button.";
         }
 
         _hookProcedure = KeyboardHookCallback;
@@ -48,7 +58,8 @@ internal sealed class GlobalHotkeyService : IDisposable
         if (_keyboardHook == 0)
         {
             var hookWarning =
-                $"Could not install the global F8 shortcut (Windows error {Marshal.GetLastWin32Error()}).";
+                $"Could not install the global {_pushToTalkShortcut} shortcut " +
+                $"(Windows error {Marshal.GetLastWin32Error()}).";
             InitialWarning = InitialWarning is null
                 ? hookWarning
                 : $"{InitialWarning} {hookWarning}";
@@ -72,16 +83,18 @@ internal sealed class GlobalHotkeyService : IDisposable
         {
             var message = wParam.ToInt32();
             var key = Marshal.ReadInt32(lParam);
-            if (key == VkF8)
+            if (key == _pushToTalkShortcut.VirtualKey)
             {
-                if (message is WmKeyDown or WmSysKeyDown && !_f8IsDown)
+                if (message is WmKeyDown or WmSysKeyDown &&
+                    !_pushToTalkIsDown &&
+                    MatchesModifiers(_pushToTalkShortcut.Modifiers))
                 {
-                    _f8IsDown = true;
+                    _pushToTalkIsDown = true;
                     PushToTalkChanged?.Invoke(true);
                 }
-                else if (message is WmKeyUp or WmSysKeyUp && _f8IsDown)
+                else if (message is WmKeyUp or WmSysKeyUp && _pushToTalkIsDown)
                 {
-                    _f8IsDown = false;
+                    _pushToTalkIsDown = false;
                     PushToTalkChanged?.Invoke(false);
                 }
             }
@@ -98,9 +111,9 @@ internal sealed class GlobalHotkeyService : IDisposable
         }
 
         _disposed = true;
-        if (_f8IsDown)
+        if (_pushToTalkIsDown)
         {
-            _f8IsDown = false;
+            _pushToTalkIsDown = false;
             PushToTalkChanged?.Invoke(false);
         }
 
@@ -120,6 +133,35 @@ internal sealed class GlobalHotkeyService : IDisposable
 
     private delegate nint HookProcedure(int code, nint wParam, nint lParam);
 
+    private static uint ToWindowsModifiers(ModifierKeys modifiers)
+    {
+        const uint modAlt = 0x0001;
+        const uint modControl = 0x0002;
+        const uint modShift = 0x0004;
+        const uint modWindows = 0x0008;
+        var result = 0u;
+        if ((modifiers & ModifierKeys.Alt) != 0) result |= modAlt;
+        if ((modifiers & ModifierKeys.Control) != 0) result |= modControl;
+        if ((modifiers & ModifierKeys.Shift) != 0) result |= modShift;
+        if ((modifiers & ModifierKeys.Windows) != 0) result |= modWindows;
+        return result;
+    }
+
+    private static bool MatchesModifiers(ModifierKeys modifiers)
+    {
+        const int vkShift = 0x10;
+        const int vkControl = 0x11;
+        const int vkAlt = 0x12;
+        const int vkLWin = 0x5B;
+        const int vkRWin = 0x5C;
+        return IsDown(vkShift) == ((modifiers & ModifierKeys.Shift) != 0)
+            && IsDown(vkControl) == ((modifiers & ModifierKeys.Control) != 0)
+            && IsDown(vkAlt) == ((modifiers & ModifierKeys.Alt) != 0)
+            && (IsDown(vkLWin) || IsDown(vkRWin)) == ((modifiers & ModifierKeys.Windows) != 0);
+    }
+
+    private static bool IsDown(int virtualKey) => GetAsyncKeyState(virtualKey) < 0;
+
     [DllImport("user32.dll", SetLastError = true)]
     private static extern bool RegisterHotKey(nint window, int id, uint modifiers, uint key);
 
@@ -135,6 +177,9 @@ internal sealed class GlobalHotkeyService : IDisposable
 
     [DllImport("user32.dll")]
     private static extern bool UnhookWindowsHookEx(nint hook);
+
+    [DllImport("user32.dll")]
+    private static extern short GetAsyncKeyState(int virtualKey);
 
     [DllImport("user32.dll")]
     private static extern nint CallNextHookEx(nint hook, int code, nint wParam, nint lParam);
